@@ -81,5 +81,5 @@ ggplot(zipCodes, aes(x = reorder(nta_name, n), y = n)) +
 # }
 ```
 
-# Import Data
+# Analysis
 Reducing the dataset and only parsing geospatial data allows us to feed it into maps to visualize the distribution of trees. It's also possible for us to plot the distribution by type so that we can understand the concentration of species on a borough and even zip code level.
