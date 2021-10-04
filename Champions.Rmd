@@ -1,0 +1,181 @@
+---
+title: "DATA 607 - Project 2 - Data Transformation - Champions"
+author: "Preston Peck"
+date: "10/2/2021"
+output: html_document
+---
+
+# Load Libraries
+
+```{r}
+library(dplyr)
+library(jsonlite)
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+library(tm)
+library(ggplot2)
+```
+
+# Import Data
+The following is a dataset for attributes belonging to every character in the popular online multiplayer online battle arena game League of Legends
+```{r warning=FALSE}
+leagueData <- fromJSON("data/champion.json")
+
+leagueFormattedData <- matrix(NA, ncol = 27)
+leagueFormattedData <- as.data.frame(leagueFormattedData)
+
+colnames(leagueFormattedData) <- c(
+  "name", 
+  "title",
+  "blurb",
+  "attack",
+  "defense",
+  "magic",
+  "difficulty",
+  "role1",
+  "role2",
+  "hp",
+  "maxHp",
+  "hpregen",
+  "maxHpregen",
+  "mp",
+  "maxMp",
+  "mpregen",
+  "maxMpregen",
+  "movespeed",
+  "armor",
+  "maxArmor",
+  "spellblock",
+  "maxSpellblock",
+  "attackrange",
+  "attackdamage",
+  "maxAttackdamage",
+  "attackspeed",
+  "maxAttackspeed"
+)
+
+data <- leagueData[["data"]]
+max <- length(data)
+
+maxLevel <- 18
+
+for (i in seq(from = 1, to = max - 1, by = 1)) {
+  champion <- data[[i]]
+  info <- champion[["info"]]
+  stats <- champion[["stats"]]
+  tags <- champion[["tags"]]
+  
+  leagueFormattedData <- leagueFormattedData %>%
+    add_row(
+      name = champion[["name"]],
+      title = champion[["title"]],
+      blurb = champion[["blurb"]],
+      attack = as.numeric(info[["attack"]]),
+      defense = as.numeric(info[["defense"]]),
+      magic = as.numeric(info[["magic"]]),
+      difficulty = as.numeric(info[["difficulty"]]),
+      role1 = tags[1],
+      role2 = tags[2],
+      hp = as.numeric(stats[["hp"]]),
+      maxHp = as.numeric(stats[["hp"]]) + as.numeric(stats[["hpperlevel"]]) * maxLevel,
+      hpregen = as.numeric(stats[["hpregen"]]),
+      maxHpregen = as.numeric(stats[["hpregen"]]) + as.numeric(stats[["hpregenperlevel"]]) * maxLevel,
+      mp = as.numeric(stats[["mp"]]),
+      maxMp = as.numeric(stats[["mp"]]) + as.numeric(stats[["mpperlevel"]]) * maxLevel,
+      mpregen = as.numeric(stats[["mpregen"]]),
+      maxMpregen = as.numeric(stats[["mpregen"]]) + as.numeric(stats[["mpregenperlevel"]]) * maxLevel,
+      movespeed = as.numeric(stats[["movespeed"]]),
+      armor = as.numeric(stats[["armor"]]),
+      maxArmor = as.numeric(stats[["armor"]]) + as.numeric(stats[["armorperlevel"]]) * maxLevel,
+      spellblock = as.numeric(stats[["spellblock"]]),
+      maxSpellblock = as.numeric(stats[["spellblock"]]) + as.numeric(stats[["spellblockperlevel"]]) * maxLevel,
+      attackrange = as.numeric(stats[["attackrange"]]),
+      attackdamage = as.numeric(stats[["attackdamage"]]),
+      maxAttackdamage = as.numeric(stats[["attackdamage"]]) + as.numeric(stats[["attackdamageperlevel"]]) * maxLevel,
+      attackspeed = as.numeric(stats[["attackspeed"]]),
+      maxAttackspeed = as.numeric(stats[["attackspeed"]]) + as.numeric(stats[["attackspeedperlevel"]]) * maxLevel
+    )
+}
+
+
+
+# Remove NA row from matrix initialization
+leagueFormattedData <- leagueFormattedData %>%
+  slice(-c(1))
+
+leagueFormattedData$baseTotal <-
+  leagueFormattedData$hp + 
+  leagueFormattedData$mp + 
+  leagueFormattedData$hpregen + 
+  leagueFormattedData$mpregen +
+  leagueFormattedData$movespeed +
+  leagueFormattedData$armor +
+  leagueFormattedData$spellblock +
+  leagueFormattedData$attackrange +
+  leagueFormattedData$attackdamage +
+  leagueFormattedData$attackspeed
+  
+leagueFormattedData$maxTotal <- 
+  leagueFormattedData$maxHp + 
+  leagueFormattedData$maxMp + 
+  leagueFormattedData$maxHpregen + 
+  leagueFormattedData$maxMpregen +
+  leagueFormattedData$movespeed +
+  leagueFormattedData$maxArmor +
+  leagueFormattedData$maxSpellblock +
+  leagueFormattedData$attackrange +
+  leagueFormattedData$maxAttackdamage +
+  leagueFormattedData$maxAttackspeed
+
+leagueFormattedData[,-3]
+
+
+
+# Analyze blurbs to potentially identify writing style, genres, themes, and tropes
+leagueFormattedData[,3]
+
+# Create a corpus 
+corpus <- Corpus(VectorSource(leagueFormattedData["blurb"]))
+
+# Clean the text data (special characters, numbers, and punctuation) and avoid the most common frequent words
+corpus <- corpus %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(stripWhitespace)
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+# Create a document-term-matrix
+dtm <- TermDocumentMatrix(corpus) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix), decreasing = TRUE) 
+
+df <- data.frame(word = names(words), freq = words)
+greaterThan4Appearances <- subset(df, freq > 4)
+greaterThan4Appearances
+
+# Generate the word cloud
+wordcloud(words = df$word, freq = df$freq, min.freq = 5,
+          max.words = 200, random.order = FALSE, rot.per = 0.35,
+          colors = brewer.pal(8, "Dark2"))
+
+# Comparison between WordCloud 1 and 2
+wordcloud2(data = greaterThan4Appearances, color='random-dark')
+
+
+
+ggplot(leagueFormattedData, aes(baseTotal, maxTotal)) +
+  geom_point(aes(colour = factor(role1))) +
+  geom_text(aes(label = name), hjust = 0, vjust = 0, , size = 2)
+
+removeOutlier <- subset(leagueFormattedData, name != "Viego")
+ggplot(removeOutlier, aes(baseTotal, maxTotal)) +
+  geom_point(aes(colour = factor(role1))) +
+  geom_text(aes(label = name), hjust = 0, vjust = 0, size = 2)
+```
+
+# Analysis
+In order to better understand the game and the demographics of its 156 characters in question, I looked at some of the popular language used to describe them. By doing so we're not onlt able to determine not only the genre of the game, but also some of the tropes and archtypes used among its cast. We see alot of terms relating to magic ("arcane") or spiritualism ("spirit", "void") indicating a fantasy setting. We also see words like "power", "war", and "city" which would point to many of the characters being military personnel in warring cities.
+
+From a pure stat perpective, we can see which characters per role are good to use early-game vs late-game when we compare the culmination of their initial stats to the culmination of their stats given time. Doing so, there's one clear outlier that stands out among the cast, which may mean that at any point they are a clear winning strategy, or that their stats are mistaken or grossly skewed for thematic instead of gameplay reasons.

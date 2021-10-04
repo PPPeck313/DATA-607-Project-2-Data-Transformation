@@ -1,0 +1,145 @@
+---
+title: "DATA 607 - Project 2 - Data Transformation - Steam App"
+author: "Preston Peck"
+date: "10/2/2021"
+output: html_document
+---
+
+# Load Libraries
+
+```{r}
+library(dplyr)
+library(jsonlite)
+library(ggplot2)
+library(stringr)
+```
+
+# Import Data
+The following is a dataset of 27000 PC games scraped from the online digital video game retailer Steam using the SteamSpy API
+```{r}
+steamData <- read.csv("data/steam_app_data.csv")
+
+steamData <- steamData[, c(
+  "name", 
+  "detailed_description", 
+  "developers",
+  "genres",
+  "metacritic",
+  "recommendations",
+  "release_date"
+)]
+
+steamData <- steamData[!(duplicated(steamData["name"])),]
+
+steamFormattedData <- matrix(NA, ncol = 7)
+steamFormattedData <- as.data.frame(steamFormattedData)
+
+colnames(steamFormattedData) <- c(
+  "name", 
+  "detailedDescription",
+  "developer",
+  "genre",
+  "score",
+  "recommendations",
+  "releaseDate"
+)
+
+max <- nrow(steamData)
+
+for (i in seq(from = 1, to = max - 1, by = 1)) {
+  developer <- steamData[i,3]
+  developer <- gsub("\\[\'", "", developer)
+  developer <- gsub("\'\\]", "", developer)
+  developer <- str_replace_all(developer, "\',.*", "")
+  developer <- if (!is.na(developer)) { developer[[1]] } else { "" }
+  
+  genre <- steamData[i,4]
+  genre <- gsub("\\{\'", "\\{\"", genre)
+  genre <- gsub("\':", "\":", genre)
+  genre <- gsub(": \'", ": \"", genre)
+  genre <- gsub("\'\\,", "\"\\,", genre)
+  genre <- gsub("\\, \'", "\\, \"", genre)
+  genre <- gsub("\'\\}", "\"\\}", genre)
+  genre <- gsub("True", "true", genre)
+  genre <- gsub("False", "false", genre)
+  # If genre is a list, it makes a new entry for every combination creating redundancies
+  genre <- if (!(is.na(genre) || genre == '')) { fromJSON(genre)[["description"]][[1]] } else { "" }
+
+  score <- steamData[i,5]
+  score <- gsub("\\{\'", "\\{\"", score)
+  score <- gsub("\':", "\":", score)
+  score <- gsub(": \'", ": \"", score)
+  score <- gsub("\'\\,", "\"\\,", score)
+  score <- gsub("\\, \'", "\\, \"", score)
+  score <- gsub("\'\\}", "\"\\}", score)
+  score <- gsub("True", "true", score)
+  score <- gsub("False", "false", score)
+  score <- if (!(is.na(score) || score == '')) { fromJSON(score)[["score"]] } else { 0 }
+  
+  recommendations <- steamData[i,6]
+  recommendations <- gsub("\\{\'", "\\{\"", recommendations)
+  recommendations <- gsub("\':", "\":", recommendations)
+  recommendations <- gsub(": \'", ": \"", recommendations)
+  recommendations <- gsub("\'\\,", "\"\\,", recommendations)
+  recommendations <- gsub("\\, \'", "\\, \"", recommendations)
+  recommendations <- gsub("\'\\}", "\"\\}", recommendations)
+  recommendations <- gsub("True", "true", recommendations)
+  recommendations <- gsub("False", "false", recommendations)
+  recommendations <- if (!(is.na(recommendations) || recommendations == '')) { fromJSON(recommendations)[["total"]] } else { 0 }
+    
+  releaseDate <- steamData[i,7]
+  releaseDate <- gsub("\\{\'", "\\{\"", releaseDate)
+  releaseDate <- gsub("\':", "\":", releaseDate)
+  releaseDate <- gsub(": \'", ": \"", releaseDate)
+  releaseDate <- gsub("\'\\,", "\"\\,", releaseDate)
+  releaseDate <- gsub("\\, \'", "\\, \"", releaseDate)
+  releaseDate <- gsub("\'\\}", "\"\\}", releaseDate)
+  releaseDate <- gsub("True", "true", releaseDate)
+  releaseDate <- gsub("False", "false", releaseDate)
+  releaseDate <- if (!(is.na(releaseDate) || releaseDate == '')) { fromJSON(releaseDate)[["date"]] } else { "" }
+
+  steamFormattedData <- steamFormattedData %>%
+    add_row(
+      name = steamData[i, 1],
+      detailedDescription = steamData[i, 2],
+      developer = developer,
+      genre = genre,
+      score = score,
+      recommendations = recommendations,
+      releaseDate = releaseDate
+    )
+}
+
+steamFormattedData <- steamFormattedData %>%
+  slice(-c(1))
+
+steamFormattedData <- steamFormattedData[with(steamFormattedData, order(-score)),]
+steamFormattedData <- steamFormattedData[1:100,]
+steamFormattedData[,-2]
+
+write.csv(steamFormattedData, "data/steam_app_data_top_100.csv")
+```
+
+```{r}
+steamTop100 <- read.csv("data/steam_app_data_top_100.csv")
+
+ggplot(steamTop100, aes(recommendations, score)) +
+  geom_point(aes(colour = factor(genre)))
+ 
+steamTop100ByGenre <-aggregate(x = steamTop100[,c("score", "recommendations")], by = steamTop100["genre"], FUN = "mean")
+steamTop100ByGenre
+
+ggplot(steamTop100ByGenre, aes(recommendations, score)) +
+  geom_point(aes(colour = factor(genre))) +
+  geom_text(aes(label = genre), hjust = 0, vjust = 0, size = 2)
+
+steamTop100ByDeveloper <-aggregate(x = steamTop100[,c("score", "recommendations")], by = steamTop100["developer"], FUN = "mean")
+steamTop100ByDeveloper
+
+ggplot(steamTop100ByDeveloper, aes(recommendations, score)) +
+  geom_point() +
+  geom_text(aes(label = developer), hjust = 0, vjust = 0, size = 2)
+```
+
+# Analysis
+With such a large dataset, it's beneficial to break it into a smaller, more digestible subset in order to better study it. To make a meaningful subset, the set was ordered by score and the top 100 best rated games were selected. From there we can slice it by genre and developer to see which scores the best and which gets recommended more on average.
