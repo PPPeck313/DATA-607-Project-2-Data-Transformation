@@ -1,0 +1,22 @@
+---
+title: "DATA 607 - Project 2 - Data Transformation - Trees"
+author: "Preston Peck"
+date: "10/3/2021"
+output: html_document
+---
+
+# Load Libraries
+
+```{r}
+library(dplyr)
+library(stringr)
+library(readr)
+library(purrr)
+```
+
+# Import Data
+
+```{r}
+treeData <- read.csv("data/2015_Street_Tree_Census_-_Tree_Data.csv")
+treeData
+```
