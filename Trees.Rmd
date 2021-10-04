@@ -12,11 +12,74 @@ library(dplyr)
 library(stringr)
 library(readr)
 library(purrr)
+library(ggmap)
+library(leaflet)
 ```
 
 # Import Data
-
+The following is a datset of tree around New York
 ```{r}
 treeData <- read.csv("data/2015_Street_Tree_Census_-_Tree_Data.csv")
-treeData
+treeData <- treeData[,c("spc_common", "latitude", "longitude", "borough", "nta_name")]
+
+species <- treeData %>% 
+  group_by(spc_common) %>% 
+  summarise(n = n())
+species
+
+ggplot(species, aes(x = reorder(spc_common, n), y = n)) + 
+  geom_col() + labs(x = "Species", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+boroughs <- treeData %>% 
+  group_by(borough) %>% 
+  summarise(n = n())
+boroughs
+
+ggplot(boroughs, aes(x = reorder(borough, n), y = n)) + 
+  geom_col() + labs(x = "Borough", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+zipCodes <- treeData %>% 
+  group_by(nta_name) %>% 
+  summarise(n = n())
+zipCodes
+
+ggplot(zipCodes, aes(x = reorder(nta_name, n), y = n)) + 
+  geom_col() + 
+  labs(x = "Zip Code", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# Requires Google Maps key
+# nyMap <- get_map(location = c(lon = -74.00, lat = 40.71),
+#     color = "color",
+#     source = "google",
+#     maptype = "terrain",
+#     zoom = 11)
+# 
+# ggmap(get_map, extent = "device", xlab = "Longitude", ylab = "Latitude") +
+#   geom_point(data = coordinates, 
+#              aes(x = longitude, y = latitude, color = spc_common),
+#              alpha = 1, 
+#              size = 1) +
+#   ggtitle("Tree Distribution in NY") +
+#   xlab("Longitude") +
+#   ylab("Latitude")
+# 
+# treeSpecies <- unique(treeData[c("spc_common")])
+# max <- length(treeSpecies)
+# max
+# 
+# Too many points to plot
+# for (i in 1:length(treeSpecies) ) {
+#   species <- subset(treeData, spc_common == treeSpecies[i])
+#   
+#   leaflet(data = species) %>%
+#     addTiles() %>%
+#     setView(-74.00, 40.71, zoom = 11) %>%
+#     addMarkers(~longitude, ~latitude, popup = ~spc_common, label = ~spc_common)
+# }
 ```
+
+# Import Data
+Reducing the dataset and only parsing geospatial data allows us to feed it into maps to visualize the distribution of trees. It's also possible for us to plot the distribution by type so that we can understand the concentration of species on a borough and even zip code level.
